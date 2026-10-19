@@ -89,6 +89,14 @@ class BaseRunner(ABC):
         )  # TODO
         self.ppo_training_params = dict(self.ppo_params)
         # self.ppo_training_params["num_timesteps"] = 150000000 * 20
+
+        # Optional CLI overrides for stability tuning during resume runs.
+        if getattr(self.args, "learning_rate", None) is not None:
+            self.ppo_training_params["learning_rate"] = self.args.learning_rate
+        if getattr(self.args, "entropy_cost", None) is not None:
+            self.ppo_training_params["entropy_cost"] = self.args.entropy_cost
+        if getattr(self.args, "discounting", None) is not None:
+            self.ppo_training_params["discounting"] = self.args.discounting
         
 
         if "network_factory" in self.ppo_params:

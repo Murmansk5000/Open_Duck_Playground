@@ -153,7 +153,10 @@ class MjInfer(MJInferBase):
         self.commands[1] = lin_vel_y
         self.commands[2] = ang_vel
 
-    def run(self):
+    def run(self, headless: bool = False, num_steps: int = 0):
+        if headless:
+            return self.run_headless(num_steps=num_steps)
+
         try:
             with mujoco.viewer.launch_passive(
                 self.model,
@@ -240,6 +243,59 @@ class MjInfer(MJInferBase):
         except KeyboardInterrupt:
             pickle.dump(self.saved_obs, open("mujoco_saved_obs.pkl", "wb"))
 
+    def run_headless(self, num_steps: int = 0):
+        try:
+            counter = 0
+            while True:
+                mujoco.mj_step(self.model, self.data)
+
+                counter += 1
+
+                if counter % self.decimation == 0:
+                    if not self.standing:
+                        self.imitation_i += 1.0 * self.phase_frequency_factor
+                        self.imitation_i = self.imitation_i % self.PRM.nb_steps_in_period
+                        self.imitation_phase = np.array(
+                            [
+                                np.cos(
+                                    self.imitation_i / self.PRM.nb_steps_in_period * 2 * np.pi
+                                ),
+                                np.sin(
+                                    self.imitation_i / self.PRM.nb_steps_in_period * 2 * np.pi
+                                ),
+                            ]
+                        )
+                    obs = self.get_obs(
+                        self.data,
+                        self.commands,
+                    )
+                    self.saved_obs.append(obs)
+                    action = self.policy.infer(obs)
+
+                    self.last_last_last_action = self.last_last_action.copy()
+                    self.last_last_action = self.last_action.copy()
+                    self.last_action = action.copy()
+
+                    self.motor_targets = self.default_actuator + action * self.action_scale
+
+                    if USE_MOTOR_SPEED_LIMITS:
+                        self.motor_targets = np.clip(
+                            self.motor_targets,
+                            self.prev_motor_targets
+                            - self.max_motor_velocity * (self.sim_dt * self.decimation),
+                            self.prev_motor_targets
+                            + self.max_motor_velocity * (self.sim_dt * self.decimation),
+                        )
+
+                        self.prev_motor_targets = self.motor_targets.copy()
+
+                    self.data.ctrl = self.motor_targets.copy()
+
+                if num_steps > 0 and counter >= num_steps:
+                    break
+        except KeyboardInterrupt:
+            pickle.dump(self.saved_obs, open("mujoco_saved_obs.pkl", "wb"))
+
 
 if __name__ == "__main__":
 
@@ -257,10 +313,17 @@ if __name__ == "__main__":
         default="playground/open_duck_mini_v2/xmls/scene_flat_terrain.xml",
     )
     parser.add_argument("--standing", action="store_true", default=False)
+    parser.add_argument("--headless", action="store_true", default=False)
+    parser.add_argument(
+        "--num_steps",
+        type=int,
+        default=0,
+        help="Maximum physics steps to run in headless mode (0 means run forever).",
+    )
 
     args = parser.parse_args()
 
     mjinfer = MjInfer(
         args.model_path, args.reference_data, args.onnx_model_path, args.standing
     )
-    mjinfer.run()
+    mjinfer.run(headless=args.headless, num_steps=args.num_steps)

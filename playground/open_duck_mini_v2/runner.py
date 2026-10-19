@@ -2,6 +2,11 @@
 
 import argparse
 
+# 引入父文件夹的模块
+import sys
+import os
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+sys.path.append(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 from playground.common import randomize
 from playground.common.runner import BaseRunner
 from playground.open_duck_mini_v2 import joystick, standing
@@ -44,6 +49,24 @@ def main() -> None:
     parser.add_argument("--num_timesteps", type=int, default=150000000)
     parser.add_argument("--env", type=str, default="joystick", help="env")
     parser.add_argument("--task", type=str, default="flat_terrain", help="Task to run")
+    parser.add_argument(
+        "--learning_rate",
+        type=float,
+        default=None,
+        help="Override PPO learning rate",
+    )
+    parser.add_argument(
+        "--entropy_cost",
+        type=float,
+        default=None,
+        help="Override PPO entropy cost",
+    )
+    parser.add_argument(
+        "--discounting",
+        type=float,
+        default=None,
+        help="Override PPO discount factor",
+    )
     parser.add_argument(
         "--restore_checkpoint_path",
         type=str,

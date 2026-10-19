@@ -9,3 +9,5 @@ checkpoints/
 .tmp/
 *.onnx
 *.TXT
+/deployment/
+/output.log
